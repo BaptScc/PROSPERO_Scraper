@@ -89,6 +89,6 @@ def retrieve_review_stage_versions(soup, driver, crd_number, v_number, versions)
     blocks = []
     for idx, txt in enumerate(version_texts):
         version_number = versions[idx] 
-        blocks.append(f"Version {version_number}:\n{txt.strip()}\n")
+        blocks.append(f"{version_number}:\n{txt.strip()}\n")
 
     return "\n".join(blocks).rstrip() + "\n"
