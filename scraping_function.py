@@ -7,7 +7,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from PROSPERO_Scraper.extraction import *
-
+from PROSPERO_Scraper.review_stage_versioning import *
+from PROSPERO_Scraper.text_section import *
 
 def scraper(crd_number, driver):
 
@@ -35,14 +36,23 @@ def scraper(crd_number, driver):
         country_text = extract_country(soup)
 
         #Citation
-        citation_header = soup.find("h2", string=lambda s: s and "Citation" in s)
-        citation_div = citation_header.find_next("div")
-        citation_text = citation_div.get_text(" ", strip=True)
+        # citation_header = soup.find("h2", string=lambda s: s and "Citation" in s)
+        # citation_div = citation_header.find_next("div")
+        # citation_text = citation_div.get_text(" ", strip=True)
+        citation_text = extract_citation(soup)
+    
 
-        # First submission date
-        history_header = soup.find("h2", string=lambda s: s and "PROSPERO version history" in s)
-        history_ul = history_header.find_next("ul")
-        versions = [li.get_text(strip=True) for li in history_ul.find_all("li")]
+        # versions
+        history_header = find_h2_heading(soup, "PROSPERO version history")
+        if history_header:
+            history_ul = history_header.find_next("ul")
+            if history_ul:
+                versions = [li.get_text(strip=True) for li in history_ul.find_all("li")]
+            else:
+                versions = []
+        else:
+            versions = []
+
 
         # Timeline of the review
         timeline_text = extract_timeline(soup)
@@ -71,15 +81,25 @@ def scraper(crd_number, driver):
         #outcome
         outcome_analyse_text = outcome_analyse(soup)
 
-        return title_text, authors_text, country_text, citation_text, versions, timeline_text, basic_details_text, additional_info, searching_screening_text, eligibility_criteria_text, data_collection_process_text, planned_data_synthesis_text, rev_aff_funding_text, outcome_analyse_text
+        #review stage + versioning
+
+        vnumber = len(versions)
+
+        review_stage_versions = retrieve_review_stage_versions(soup, driver, crd_number, vnumber, versions)
+
+        #completed
+        completed = extract_review_status(soup)
+        completed_status = ["Yes" if completed == "The review is completed." else "No"]
+
+        return title_text, authors_text, country_text, citation_text, versions, timeline_text, basic_details_text, additional_info, searching_screening_text, eligibility_criteria_text, data_collection_process_text, planned_data_synthesis_text, rev_aff_funding_text, outcome_analyse_text, review_stage_versions, completed_status
 
     except TimeoutException:
         print("Timeout exception")
-        return "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+        return "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
 
     except Exception as e:
-        print("Error")
-        return "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+        print(f"Error: {e}")
+        return "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
 
 
 def process_crd_numbers(crd_number_list):
@@ -100,9 +120,11 @@ def process_crd_numbers(crd_number_list):
     planned_data_synthesis_list = []
     rev_aff_funding_list = []
     outcome_analyse_list = []
+    review_stage_versions_list = []
+    completed_status_list = []
 
     for crd_number in tqdm(crd_number_list):
-        title_text, authors_text, country_text, citation_text, versions, timeline_text, basic_details_text, additional_info, searching_screening_text, eligibility_criteria_text, data_collection_process_text, planned_data_synthesis_text, rev_aff_funding_text, outcome_analyse_text = scraper(crd_number, driver)
+        title_text, authors_text, country_text, citation_text, versions, timeline_text, basic_details_text, additional_info, searching_screening_text, eligibility_criteria_text, data_collection_process_text, planned_data_synthesis_text, rev_aff_funding_text, outcome_analyse_text, review_stage_versions, completed_status = scraper(crd_number, driver)
         title_list.append(title_text)
         authors_list.append(authors_text)
         country_list.append(country_text)
@@ -117,6 +139,8 @@ def process_crd_numbers(crd_number_list):
         planned_data_synthesis_list.append(planned_data_synthesis_text)
         rev_aff_funding_list.append(rev_aff_funding_text)
         outcome_analyse_list.append(outcome_analyse_text)
+        review_stage_versions_list.append(review_stage_versions)
+        completed_status_list.append(completed_status)
 
     driver.quit()
 
@@ -128,6 +152,8 @@ def process_crd_numbers(crd_number_list):
         "Date": [int(val[-4:]) if val and val[-4:].isdigit() else ""
             for val in ["; ".join(ver) if ver else None for ver in version_history_list]],
         "Citation" : citation_list,
+        "Is completed" : [comp[0] if comp else None for comp in completed_status_list],
+        "Number of versions": [len(ver) if ver else None for ver in version_history_list],
         "Versions": ["; ".join(ver) if ver else None for ver in version_history_list],
         "Timeline of the study" : timeline_list,
         "Review basic details" : basic_details_text_list,
@@ -137,6 +163,7 @@ def process_crd_numbers(crd_number_list):
         "Planned data synthesis" : planned_data_synthesis_list,
         "Review, affiliation and funding" : rev_aff_funding_list,
         "Outcomes to be analysed" : outcome_analyse_list,
+        "Review stage versions" : review_stage_versions_list,
         "Additional information" : additional_info_list
     })
 

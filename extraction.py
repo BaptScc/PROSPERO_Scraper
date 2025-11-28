@@ -1,19 +1,18 @@
 from bs4 import BeautifulSoup
 
 def extract_country(soup):
-    h2_country = soup.find("h2", string=lambda s: s and s.strip().lower() == "country")
-    if not h2_country:
-        return "" 
-    parent_div = h2_country.find_parent("div")
-
-    if not parent_div:
+    h2 = soup.find(
+        lambda tag: tag.name == "h2" and "country" in tag.get_text(strip=True).lower()
+    )
+    if not h2:
         return ""
 
-    p = parent_div.find("p")
+    p = h2.find_next("p")
     if not p:
         return ""
 
-    return p.get_text(strip=True)
+    return p.get_text(" ", strip=True)
+
 
 def extract_review_basic_details(soup):
     basic_details_text = ""
@@ -357,26 +356,49 @@ def outcome_analyse(soup):
 
     return "\n".join(basic_blocks).rstrip()
 
-
-
 def extract_timeline(soup):
-    timeline_h1 = soup.find("h1", string=lambda s: s and "TIMELINE OF THE REVIEW" in s)
-    timeline_section = timeline_h1.find_parent("div", class_="section")
+
+    timeline_h1 = soup.find(
+        lambda tag: tag.name == "h1"
+        and "timeline of the review" in tag.get_text(strip=True).lower()
+    )
+    if not timeline_h1:
+        return ""
+
+    section = timeline_h1.find_parent("div", class_="section") or timeline_h1.find_parent("div")
+    if not section:
+        return ""
+
     timeline_items = []
-    for block in timeline_section.find_all("div", recursive=False):
-        h2 = block.find("h2")
-        if not h2:
-            continue
+
+    for h2 in section.find_all("h2"):
+        for span in h2.find_all("span", class_="changes"):
+            span.decompose()
+
         heading = h2.get_text(strip=True)
-        if "CURRENT REVIEW STAGE" in heading.upper():
-            break
-        p = block.find("p")
-        if not p:
+        if not heading:
             continue
-        value = p.get_text(strip=False)
-        timeline_items.append(f"{heading}\n{value}\n")
-    timeline_text = "\n".join(timeline_items)
-    return timeline_text
+
+        texts = []
+
+        for sib in h2.next_siblings:
+            if getattr(sib, "name", None) == "h2":
+                break
+            if not hasattr(sib, "get_text"):
+                continue
+
+            for span in sib.find_all("span", class_="changes"):
+                span.decompose()
+
+            txt = sib.get_text(" ", strip=True)
+            if txt:
+                texts.append(txt)
+
+        if texts:
+            timeline_items.append(f"{heading}\n" + "\n".join(texts) + "\n")
+
+    return "\n".join(timeline_items).strip()
+
     
 
 def extract_add_information(soup):
@@ -418,3 +440,16 @@ def extract_add_information(soup):
             add_information = "\n".join(basic_blocks).rstrip()
     return add_information
 
+def extract_review_status(soup):
+    h2 = soup.find("h2", string=lambda s: s and "Review status" in s)
+    if not h2:
+        return ""
+    p = h2.find_next_sibling("p")
+    if p:
+        return p.get_text(strip=True)
+    div = h2.find_next_sibling("div")
+    if div:
+        txt = div.get_text(" ", strip=True)
+        return txt
+
+    return ""
