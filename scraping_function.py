@@ -85,21 +85,36 @@ def scraper(crd_number, driver):
 
         vnumber = len(versions)
 
-        review_stage_versions = retrieve_review_stage_versions(soup, driver, crd_number, vnumber, versions)
+        ####
+        if vnumber > 0 :
+
+            review_stage_versions = retrieve_review_stage_versions(soup, driver, crd_number, vnumber, versions)
+                                                                   
+            #completed
+            completed = extract_review_status(soup)
+            completed_status = ["Yes" if completed == "The review is completed." else "No"]
+        else:
+            review_stage_versions= None
+            completed_status= None
+        ####
 
         #completed
         completed = extract_review_status(soup)
         completed_status = ["Yes" if completed == "The review is completed." else "No"]
 
-        return title_text, authors_text, country_text, citation_text, versions, timeline_text, basic_details_text, additional_info, searching_screening_text, eligibility_criteria_text, data_collection_process_text, planned_data_synthesis_text, rev_aff_funding_text, outcome_analyse_text, review_stage_versions, completed_status
+        timeout = "False"
+
+        return title_text, authors_text, country_text, citation_text, versions, timeline_text, basic_details_text, additional_info, searching_screening_text, eligibility_criteria_text, data_collection_process_text, planned_data_synthesis_text, rev_aff_funding_text, outcome_analyse_text, review_stage_versions, completed_status, timeout
 
     except TimeoutException:
         print("Timeout exception")
-        return "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+        timeout = "True"
+        return "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", timeout
 
     except Exception as e:
         print(f"Error: {e}")
-        return "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+        timeout = "False"
+        return "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", timeout
 
 
 def process_crd_numbers(crd_number_list):
@@ -122,9 +137,10 @@ def process_crd_numbers(crd_number_list):
     outcome_analyse_list = []
     review_stage_versions_list = []
     completed_status_list = []
+    timeout_exception_list = []
 
     for crd_number in tqdm(crd_number_list):
-        title_text, authors_text, country_text, citation_text, versions, timeline_text, basic_details_text, additional_info, searching_screening_text, eligibility_criteria_text, data_collection_process_text, planned_data_synthesis_text, rev_aff_funding_text, outcome_analyse_text, review_stage_versions, completed_status = scraper(crd_number, driver)
+        title_text, authors_text, country_text, citation_text, versions, timeline_text, basic_details_text, additional_info, searching_screening_text, eligibility_criteria_text, data_collection_process_text, planned_data_synthesis_text, rev_aff_funding_text, outcome_analyse_text, review_stage_versions, completed_status, timeout_exception = scraper(crd_number, driver)
         title_list.append(title_text)
         authors_list.append(authors_text)
         country_list.append(country_text)
@@ -141,6 +157,7 @@ def process_crd_numbers(crd_number_list):
         outcome_analyse_list.append(outcome_analyse_text)
         review_stage_versions_list.append(review_stage_versions)
         completed_status_list.append(completed_status)
+        timeout_exception_list.append(timeout_exception)
 
     driver.quit()
 
@@ -164,7 +181,9 @@ def process_crd_numbers(crd_number_list):
         "Review, affiliation and funding" : rev_aff_funding_list,
         "Outcomes to be analysed" : outcome_analyse_list,
         "Review stage versions" : review_stage_versions_list,
-        "Additional information" : additional_info_list
+        "Additional information" : additional_info_list,
+        "Timeout exception" : timeout_exception_list
+
     })
 
     return df
