@@ -84,8 +84,19 @@ def scraper(crd_number, driver):
         #review stage + versioning
 
         vnumber = len(versions)
+        
+        ####
+        if vnumber > 0 :
 
-        review_stage_versions = retrieve_review_stage_versions(soup, driver, crd_number, vnumber, versions)
+            review_stage_versions = retrieve_review_stage_versions(soup, driver, crd_number, vnumber, versions)
+                                                                   
+            #completed
+            completed = extract_review_status(soup)
+            completed_status = ["Yes" if completed == "The review is completed." else "No"]
+        else:
+            review_stage_versions= None
+            completed_status= None
+        ####
 
         #completed
         completed = extract_review_status(soup)
